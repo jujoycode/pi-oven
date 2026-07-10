@@ -52,7 +52,4 @@
     <ellipse cx="180" cy="178" rx="8.5" ry="5.5"/>
   </g>
 
-  <!-- little π brand on the crust top -->
-  <text x="130" y="151" text-anchor="middle" font-family="Georgia, serif"
-        font-size="22" font-weight="bold" fill="#C77F35" opacity="0.85">π</text>
 </svg>
