@@ -11,7 +11,7 @@ Pi 에이전트가 텍스트로 질문하는 대신 인터랙티브 터미널 UI
 | `notify_os` | 터미널 밖에서도 보이는 알림 | Windows 토스트 / macOS / Linux 네이티브 알림 |
 
 설치하면 세션 시작마다 마스코트 **Pai**(`╭◕‿◕╮`)가 헤더에서 마중 나온다.
-`/pai` 커맨드로 아무 때나 소환할 수 있다 (로드 확인 겸용).
+헤더가 보이면 확장이 로드된 것이다.
 
 `notify_os`는 Windows(및 WSL)에서 `powershell.exe`로 토스트를 직접 띄우므로
 터미널이 백그라운드여도 알림이 보인다. `/notify-test` 커맨드로 즉시 테스트 가능.
@@ -34,7 +34,7 @@ pi install git:github.com/<you>/pi-ui-kit
 pi install npm:pi-ui-kit
 ```
 
-설치 후 세션에서 `/ask-demo` 를 치면 로드 확인용 안내가 뜬다.
+설치 후 세션을 시작하면 Pai 헤더가 뜬다 — 그게 로드 확인이다.
 
 ## 테스트
 
