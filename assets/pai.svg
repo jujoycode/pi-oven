@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 220" width="260" height="220">
+  <!-- Pai — the pi-oven mascot. A freshly baked pie, still steaming. -->
+
+  <!-- steam -->
+  <g fill="none" stroke="#AEB6BF" stroke-width="7" stroke-linecap="round" opacity="0.75">
+    <path d="M92 62 C 86 50, 98 44, 92 32"/>
+    <path d="M130 54 C 124 42, 136 36, 130 22"/>
+    <path d="M168 62 C 162 50, 174 44, 168 32"/>
+  </g>
+
+  <!-- pie tin -->
+  <path d="M50 158 L 210 158 L 198 196 Q 196 202 190 202 L 70 202 Q 64 202 62 196 Z"
+        fill="#C77F35"/>
+  <!-- tin highlight band -->
+  <path d="M58 166 L 202 166 L 199 176 L 61 176 Z" fill="#B06E28" opacity="0.55"/>
+
+  <!-- pie body -->
+  <path d="M50 158 Q 50 100 130 100 Q 210 100 210 158 Z" fill="#F0B458"/>
+
+  <!-- scalloped crust rim: clean row of bumps (the ◠◠◠◠ line) -->
+  <g fill="#E8A040">
+    <circle cx="63"  cy="147" r="14"/>
+    <circle cx="86"  cy="135" r="14"/>
+    <circle cx="108" cy="128" r="14"/>
+    <circle cx="130" cy="125" r="14"/>
+    <circle cx="152" cy="128" r="14"/>
+    <circle cx="174" cy="135" r="14"/>
+    <circle cx="197" cy="147" r="14"/>
+  </g>
+  <!-- soft highlight on the dome -->
+  <path d="M78 118 Q 130 102 182 118 Q 156 108 130 108 Q 104 108 78 118 Z"
+        fill="#F7C878" opacity="0.9"/>
+
+  <!-- face -->
+  <!-- eyes: ◕ style, big and glossy -->
+  <g fill="#4A3121">
+    <circle cx="98" cy="166" r="10.5"/>
+    <circle cx="162" cy="166" r="10.5"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="101.5" cy="162.5" r="3.6"/>
+    <circle cx="165.5" cy="162.5" r="3.6"/>
+  </g>
+
+  <!-- mouth: ᵕ smile -->
+  <path d="M122 174 Q 130 182 138 174" fill="none" stroke="#4A3121"
+        stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- cheeks -->
+  <g fill="#EE7B5B" opacity="0.45">
+    <ellipse cx="80" cy="178" rx="8.5" ry="5.5"/>
+    <ellipse cx="180" cy="178" rx="8.5" ry="5.5"/>
+  </g>
+
+</svg>
