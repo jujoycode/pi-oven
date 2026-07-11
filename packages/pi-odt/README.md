@@ -6,7 +6,8 @@ OpenDocument Text(.odt)를 읽는 `read_odt` 툴. ODT는 ZIP이라 pi 내장 rea
 - 표는 행 단위 `| 셀 | 셀 |`로
 - 공백 압축(`text:s`), 탭, 줄바꿈 처리
 
-외부 의존성 없음 — ZIP 파서 내장, 압축 해제는 node:zlib.
+**의존성 제로, 순수 TS** — ZIP 파서와 DEFLATE 해제까지 전부 직접 구현.
+네이티브 바이너리가 없어 내부망·폐쇄망에서도 파일 복사만으로 동작한다.
 
 ## 설치
 
