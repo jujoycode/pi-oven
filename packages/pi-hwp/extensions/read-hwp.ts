@@ -336,8 +336,8 @@ export function extractHwp5Images(buf: Buffer): EmbeddedImage[] {
 
 /**
  * 이미지들을 툴 결과로 변환한다:
- * - 비전 모델이 바로 보도록 png/jpg/gif/webp는 ImageContent로 첨부 (개수·크기 상한)
- * - 전체 목록은 임시 파일로 풀어 경로를 텍스트로 나열 (bmp 등 미첨부 포맷 포함)
+ * - 기본은 임시 파일로 풀어 경로만 나열 — 이미지 토큰을 매 턴 지불하지 않는다
+ * - attach(images: true)면 png/jpg/gif/webp를 ImageContent로 첨부 (개수·크기 상한)
  */
 const ATTACH_LIMIT = 8;
 const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
@@ -375,8 +375,13 @@ export function imagesToResult(
   }
 
   const note =
-    `\n\n[embedded images: ${images.length}, ${blocks.length} attached below` +
-    (blocks.length < images.length ? "; the rest are available at the listed paths" : "") +
+    `\n\n[embedded images: ${images.length}` +
+    (blocks.length > 0 ? `, ${blocks.length} attached below` : "") +
+    (blocks.length < images.length
+      ? attach
+        ? "; the rest are available at the listed paths"
+        : "; call again with images: true to view them"
+      : "") +
     "]\n" +
     lines.join("\n");
   return { note, blocks, paths };
@@ -398,12 +403,17 @@ export default function (pi: ExtensionAPI) {
     promptGuidelines: [
       "The built-in read tool cannot parse .hwp/.hwpx files. " +
         "Always use read_hwp for Korean word processor documents. " +
-        "Embedded images are attached to the result — read text inside them directly.",
+        "If the result lists embedded images and their content matters — scanned pages, " +
+        "charts, or a document with little extractable text — call read_hwp again with " +
+        "images: true to view them.",
     ],
     parameters: Type.Object({
       path: Type.String({ description: "Path to the .hwp or .hwpx file" }),
       images: Type.Optional(
-        Type.Boolean({ description: "Attach embedded images to the result (default true)" }),
+        Type.Boolean({
+          description:
+            "Attach embedded images to the result for vision (default false — only paths are listed)",
+        }),
       ),
     }),
 
@@ -430,7 +440,7 @@ export default function (pi: ExtensionAPI) {
 
       const truncated = text.length > MAX_CHARS;
       if (truncated) text = text.slice(0, MAX_CHARS);
-      const { note, blocks, paths } = imagesToResult("pi-hwp-", images, params.images !== false);
+      const { note, blocks, paths } = imagesToResult("pi-hwp-", images, params.images === true);
 
       return {
         content: [
