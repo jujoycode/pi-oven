@@ -14,6 +14,8 @@ Where fresh pi packages are baked. `╭◕‿◕╮`
 | 패키지 | 설명 | 설치 |
 |---|---|---|
 | [pi-ui-kit](packages/pi-ui-kit) | 인터랙티브 선택 UI, 텍스트 프롬프트, OS 알림 + 마스코트 Pai | `pi install npm:pi-ui-kit` |
+| [pi-hwp](packages/pi-hwp) | 한글 문서(.hwpx/.hwp 5.x) 텍스트·표 추출, 의존성 제로 | `pi install npm:pi-hwp` |
+| [pi-odt](packages/pi-odt) | OpenDocument(.odt) 텍스트·표 추출, 의존성 제로 | `pi install npm:pi-odt` |
 
 ## 개발
 
