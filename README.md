@@ -17,6 +17,14 @@ Where fresh pi packages are baked. `╭◕‿◕╮`
 | [pi-hwp](packages/pi-hwp) | 한글 문서(.hwpx/.hwp 5.x) 텍스트·표 추출, 의존성 제로 | `pi install npm:pi-hwp` |
 | [pi-odt](packages/pi-odt) | OpenDocument(.odt) 텍스트·표 추출, 의존성 제로 | `pi install npm:pi-odt` |
 
+## 동작 모습
+
+`read_odt`가 실제 pi 세션에서 실행된 모습 — 툴이 문서를 추출하고, 모델이 표를 해석한다:
+
+<p align="center">
+  <img src="docs/screenshots/read-odt.png" width="720" alt="read_odt running inside a real pi session">
+</p>
+
 ## 개발
 
 ```bash
