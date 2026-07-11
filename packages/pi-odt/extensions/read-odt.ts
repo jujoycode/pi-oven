@@ -13,7 +13,9 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
 // ---------------------------------------------------------------- ZIP
@@ -121,6 +123,69 @@ export function extractOdt(buf: Buffer): string {
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// ---------------------------------------------------------------- 내장 이미지
+
+export interface EmbeddedImage {
+  name: string;
+  data: Buffer;
+}
+
+/** ODT: ZIP의 Pictures/ 항목이 내장 이미지다. */
+export function extractOdtImages(buf: Buffer): EmbeddedImage[] {
+  const entries = readZip(buf);
+  return [...entries]
+    .filter(([n]) => n.startsWith("Pictures/"))
+    .map(([name, data]) => ({ name, data }));
+}
+
+/**
+ * 이미지들을 툴 결과로 변환한다:
+ * - 비전 모델이 바로 보도록 png/jpg/gif/webp는 ImageContent로 첨부 (개수·크기 상한)
+ * - 전체 목록은 임시 파일로 풀어 경로를 텍스트로 나열
+ */
+const ATTACH_LIMIT = 8;
+const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
+const ATTACH_MIME: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+export function imagesToResult(
+  tempPrefix: string,
+  images: EmbeddedImage[],
+  attach: boolean,
+): { note: string; blocks: { type: "image"; data: string; mimeType: string }[]; paths: string[] } {
+  if (images.length === 0) return { note: "", blocks: [], paths: [] };
+
+  const dir = mkdtempSync(join(tmpdir(), tempPrefix));
+  const blocks: { type: "image"; data: string; mimeType: string }[] = [];
+  const lines: string[] = [];
+  const paths: string[] = [];
+
+  for (const img of images) {
+    const p = join(dir, basename(img.name));
+    writeFileSync(p, img.data);
+    paths.push(p);
+
+    const ext = img.name.split(".").pop()?.toLowerCase() ?? "";
+    const mime = ATTACH_MIME[ext];
+    const attached =
+      attach && mime !== undefined && img.data.length <= ATTACH_MAX_BYTES && blocks.length < ATTACH_LIMIT;
+    if (attached) blocks.push({ type: "image", data: img.data.toString("base64"), mimeType: mime });
+    lines.push(`- ${p} (${Math.max(1, Math.round(img.data.length / 1024))}KB${attached ? ", attached below" : ""})`);
+  }
+
+  const note =
+    `\n\n[embedded images: ${images.length}, ${blocks.length} attached below` +
+    (blocks.length < images.length ? "; the rest are available at the listed paths" : "") +
+    "]\n" +
+    lines.join("\n");
+  return { note, blocks, paths };
+}
+
 // ---------------------------------------------------------------- 툴 등록
 
 const MAX_CHARS = 200_000;
@@ -136,10 +201,14 @@ export default function (pi: ExtensionAPI) {
     promptSnippet: "Read OpenDocument .odt files",
     promptGuidelines: [
       "The built-in read tool cannot parse .odt files (they are ZIP archives). " +
-        "Always use read_odt for OpenDocument text files.",
+        "Always use read_odt for OpenDocument text files. " +
+        "Embedded images are attached to the result — read text inside them directly.",
     ],
     parameters: Type.Object({
       path: Type.String({ description: "Path to the .odt file" }),
+      images: Type.Optional(
+        Type.Boolean({ description: "Attach embedded images to the result (default true)" }),
+      ),
     }),
 
     async execute(_toolCallId, params) {
@@ -151,6 +220,7 @@ export default function (pi: ExtensionAPI) {
 
       const truncated = text.length > MAX_CHARS;
       if (truncated) text = text.slice(0, MAX_CHARS);
+      const { note, blocks, paths } = imagesToResult("pi-odt-", extractOdtImages(buf), params.images !== false);
 
       return {
         content: [
@@ -158,10 +228,12 @@ export default function (pi: ExtensionAPI) {
             type: "text" as const,
             text:
               (text || "(document contains no extractable text)") +
-              (truncated ? `\n\n[truncated at ${MAX_CHARS} chars]` : ""),
+              (truncated ? `\n\n[truncated at ${MAX_CHARS} chars]` : "") +
+              note,
           },
+          ...blocks,
         ],
-        details: { path: params.path, chars: text.length, truncated },
+        details: { path: params.path, chars: text.length, truncated, imagePaths: paths },
       };
     },
   });
