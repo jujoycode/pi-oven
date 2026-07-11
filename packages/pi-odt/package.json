@@ -1,0 +1,19 @@
+{
+  "name": "pi-odt",
+  "version": "0.1.0",
+  "description": "Read OpenDocument Text (.odt) files in Pi: extracts headings, paragraphs, lists, and tables the built-in read tool cannot parse. Zero dependencies.",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "typebox": "^1.3.6"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  }
+}
