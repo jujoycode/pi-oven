@@ -12,6 +12,14 @@ Current packages:
 - `pi-hwp` — `read_hwp` tool: extracts text/tables from Korean HWP/HWPX documents (hand-written ZIP and CFB parsers)
 - `pi-odt` — `read_odt` tool: extracts text/tables from OpenDocument `.odt` files (hand-written ZIP parser)
 
+## Core principles (from the maintainer)
+
+These override anything else in this file when they conflict:
+
+1. **Use what Node supports natively, as-is.** If a Node builtin covers the need (`node:zlib`, `node:fs`, `node:child_process`, `node:os`, ...), use it directly — don't add an npm dependency for it and don't reimplement it by hand. Hand-written parsing (ZIP/CFB) exists only where Node has no builtin.
+2. **Every review applies multiple rule sets, always including the ponytail review.** Ponytail (what changed / what was cut / what was actually verified / what was intentionally not built) is the baseline for every PR and self-review; layer the other repo rules on top of it — zero-dependency check, Korean doc convention, typecheck + `pi -e` load verification, screenshot for visible TUI changes.
+3. **Develop pi-답게 — in pi's philosophy.** Small single-file extensions, no build step, zero runtime dependencies (pi supplies peers), tools that teach the agent via `promptGuidelines` instead of requiring user instruction, clear errors over partial output, and minimal TUI that respects `visibleWidth` and the theme. When in doubt, choose the smaller, more self-contained design.
+
 ## Commands
 
 ```bash
