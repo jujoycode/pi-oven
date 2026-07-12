@@ -16,6 +16,7 @@ Where fresh pi packages are baked. `╭◕‿◕╮`
 | [pi-ui-kit](packages/pi-ui-kit) | 인터랙티브 선택 UI, 텍스트 프롬프트, OS 알림 + 마스코트 Pai | `pi install npm:pi-ui-kit` |
 | [pi-hwp](packages/pi-hwp) | 한글 문서(.hwpx/.hwp 5.x) 텍스트·표 추출 + 내장 이미지 추출(비전 첨부는 옵션), 의존성 제로 | `pi install npm:pi-hwp` |
 | [pi-odt](packages/pi-odt) | OpenDocument(.odt) 텍스트·표 추출 + 내장 이미지 추출(비전 첨부는 옵션), 의존성 제로 | `pi install npm:pi-odt` |
+| [pi-db](packages/pi-db) | MySQL·Oracle 읽기 전용 질의 + 트랜잭션·락 조회 (`query_db`), 크리덴셜은 설정 파일로 분리 | `pi install npm:pi-db` |
 
 ## 동작 모습
 
