@@ -1,0 +1,53 @@
+name: pi-db integration
+
+# 실제 MySQL 8.4 + Oracle Free 23(Thin 모드)에 붙어 query_db의 전체 경로를 검증한다.
+# Oracle 컨테이너 기동이 느려서(1~3분) pi-db가 바뀔 때만 돈다.
+
+on:
+  push:
+    paths:
+      - "packages/pi-db/**"
+      - ".github/workflows/pi-db-integration.yml"
+  pull_request:
+    paths:
+      - "packages/pi-db/**"
+      - ".github/workflows/pi-db-integration.yml"
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: testdb
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      oracle:
+        image: gvenzl/oracle-free:23-slim
+        env:
+          ORACLE_PASSWORD: oraclepw
+          APP_USER: testuser
+          APP_USER_PASSWORD: testpw
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 20s
+          --health-timeout 10s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --experimental-strip-types packages/pi-db/test/integration.mjs

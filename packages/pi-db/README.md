@@ -52,6 +52,17 @@ Node 빌트인이 없고, Oracle TNS는 비공개 프로토콜이라 수제 구�
 > hr 디비에 지금 락 잡고 있는 트랜잭션 있어?
 ```
 
+실 DB 통합 테스트는 `test/integration.mjs` — 도커로 MySQL 8.4 + Oracle Free 23을
+띄우고 마크다운 렌더링, 읽기 전용 거절, 열린 트랜잭션의 시스템 뷰 노출까지 검증한다.
+CI(`.github/workflows/pi-db-integration.yml`)는 pi-db가 바뀔 때 같은 스크립트를
+서비스 컨테이너로 돌린다:
+
+```bash
+docker run -d -e MYSQL_ROOT_PASSWORD=rootpw -e MYSQL_DATABASE=testdb -p 3306:3306 mysql:8.4
+docker run -d -e ORACLE_PASSWORD=oraclepw -e APP_USER=testuser -e APP_USER_PASSWORD=testpw -p 1521:1521 gvenzl/oracle-free:23-slim
+node --experimental-strip-types packages/pi-db/test/integration.mjs
+```
+
 `promptGuidelines`가 주입되므로 에이전트는 트랜잭션·락 질문에
 `information_schema.innodb_trx`(MySQL), `v$transaction`·`v$lock`(Oracle) 같은
 시스템 뷰를 알아서 질의한다.
