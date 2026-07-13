@@ -28,7 +28,7 @@ npm run typecheck              # tsc --noEmit over packages/*/extensions/**/*.ts
 pi -e ./packages/<name>        # load a package into a local pi session without installing
 ```
 
-There is **no build step** — pi loads the TypeScript sources directly — and no test runner or linter. `npm run typecheck` is the only automated check; CI (`.github/workflows/typecheck.yml`) runs exactly `npm ci && npm run typecheck` on Node 22. Behavioral verification is manual: load the package with `pi -e` and exercise the tool in a real session (against real `.hwp`/`.odt` files for the readers).
+There is **no build step** — pi loads the TypeScript sources directly — and no test runner or linter. `npm run typecheck` is the repo-wide automated check; CI (`.github/workflows/typecheck.yml`) runs exactly `npm ci && npm run typecheck` on Node 22. Exception: pi-db has a real-database integration test (`node --experimental-strip-types packages/pi-db/test/integration.mjs` against dockerized MySQL 8.4 + Oracle Free 23; CI runs the same script via service containers in `.github/workflows/pi-db-integration.yml` when pi-db changes). Other behavioral verification is manual: load the package with `pi -e` and exercise the tool in a real session (against real `.hwp`/`.odt` files for the readers).
 
 ## Architecture
 
