@@ -11,6 +11,8 @@ Current packages:
 - `pi-ui-kit` — interactive terminal UI tools (`ask_user`, `ask_text`, `notify_os`) plus the Pai mascot session header
 - `pi-hwp` — `read_hwp` tool: extracts text/tables from Korean HWP/HWPX documents (hand-written ZIP and CFB parsers)
 - `pi-odt` — `read_odt` tool: extracts text/tables from OpenDocument `.odt` files (hand-written ZIP parser)
+- `pi-db` — `query_db` tool: read-only SQL against MySQL/Oracle connections named in `.pi/db.json` (the repo's only package with runtime dependencies: mysql2 + oracledb Thin mode, both pure JS)
+- `pi-log` — `tail_log` / `watch_log` tools: efficient tail of huge log files (regex filter, incremental byte cursor, .gz, euc-kr) and blocking wait for a pattern in a growing log
 
 ## Core principles (from the maintainer)
 
@@ -28,7 +30,7 @@ npm run typecheck              # tsc --noEmit over packages/*/extensions/**/*.ts
 pi -e ./packages/<name>        # load a package into a local pi session without installing
 ```
 
-There is **no build step** — pi loads the TypeScript sources directly — and no test runner or linter. `npm run typecheck` is the repo-wide automated check; CI (`.github/workflows/typecheck.yml`) runs exactly `npm ci && npm run typecheck` on Node 22. Exception: pi-db has a real-database integration test (`node --experimental-strip-types packages/pi-db/test/integration.mjs` against dockerized MySQL 8.4 + Oracle Free 23; CI runs the same script via service containers in `.github/workflows/pi-db-integration.yml` when pi-db changes). Other behavioral verification is manual: load the package with `pi -e` and exercise the tool in a real session (against real `.hwp`/`.odt` files for the readers).
+There is **no build step** — pi loads the TypeScript sources directly — and no test runner or linter. `npm run typecheck` is the repo-wide automated check; CI (`.github/workflows/typecheck.yml`) runs exactly `npm ci && npm run typecheck` on Node 22. Exceptions: pi-db has a real-database integration test (`node --experimental-strip-types packages/pi-db/test/integration.mjs` against dockerized MySQL 8.4 + Oracle Free 23; CI runs the same script via service containers in `.github/workflows/pi-db-integration.yml` when pi-db changes), and pi-log has a filesystem behavior test (`node --experimental-strip-types packages/pi-log/test/log.test.mjs`, CI: `.github/workflows/pi-log-test.yml`). Other behavioral verification is manual: load the package with `pi -e` and exercise the tool in a real session (against real `.hwp`/`.odt` files for the readers).
 
 ## Architecture
 

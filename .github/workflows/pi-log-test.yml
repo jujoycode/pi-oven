@@ -1,0 +1,26 @@
+name: pi-log test
+
+# 파일시스템만 쓰는 동작 테스트 — 서비스 컨테이너 없이 수 초면 끝난다.
+
+on:
+  push:
+    paths:
+      - "packages/pi-log/**"
+      - ".github/workflows/pi-log-test.yml"
+  pull_request:
+    paths:
+      - "packages/pi-log/**"
+      - ".github/workflows/pi-log-test.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --experimental-strip-types packages/pi-log/test/log.test.mjs
