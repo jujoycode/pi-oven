@@ -1,0 +1,19 @@
+{
+  "name": "pi-log",
+  "version": "0.1.0",
+  "description": "Watch server logs in Pi: tail_log reads the last N lines of huge log files with regex filtering and an incremental cursor; watch_log blocks until a pattern appears (or times out). Zero dependencies.",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.80.6",
+    "typebox": "^1.3.6"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  }
+}
