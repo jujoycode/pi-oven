@@ -12,7 +12,7 @@ Current packages:
 - `pi-hwp` — `read_hwp` tool: extracts text/tables from Korean HWP/HWPX documents (hand-written ZIP and CFB parsers)
 - `pi-odt` — `read_odt` tool: extracts text/tables from OpenDocument `.odt` files (hand-written ZIP parser)
 - `pi-db` — `query_db` tool: read-only SQL against MySQL/Oracle connections named in `.pi/db.json` (the repo's only package with runtime dependencies: mysql2 + oracledb Thin mode, both pure JS)
-- `pi-log` — `tail_log` / `watch_log` tools: efficient tail of huge log files (regex filter, incremental byte cursor, .gz, euc-kr) and blocking wait for a pattern in a growing log
+- `pi-log` — `tail_log` / `watch_log` / `search_log` tools: efficient tail of huge log files (regex filter, incremental byte cursor, .gz, euc-kr), blocking wait for a pattern in a growing log, and event search across globs — all also against remote servers over ssh (named in `.pi/log.json`, read-only command set)
 
 ## Core principles (from the maintainer)
 

@@ -17,7 +17,7 @@ Where fresh pi packages are baked. `╭◕‿◕╮`
 | [pi-hwp](packages/pi-hwp) | 한글 문서(.hwpx/.hwp 5.x) 텍스트·표 추출 + 내장 이미지 추출(비전 첨부는 옵션), 의존성 제로 | `pi install npm:pi-hwp` |
 | [pi-odt](packages/pi-odt) | OpenDocument(.odt) 텍스트·표 추출 + 내장 이미지 추출(비전 첨부는 옵션), 의존성 제로 | `pi install npm:pi-odt` |
 | [pi-db](packages/pi-db) | MySQL·Oracle 읽기 전용 질의 + 트랜잭션·락 조회 (`query_db`), 크리덴셜은 설정 파일로 분리 | `pi install npm:pi-db` |
-| [pi-log](packages/pi-log) | 대용량 로그 tail(`tail_log`: grep·증분 커서·gz·euc-kr) + 패턴 대기(`watch_log`), 의존성 제로 | `pi install npm:pi-log` |
+| [pi-log](packages/pi-log) | 서버 로그 툴 — tail(`tail_log`)·패턴 대기(`watch_log`)·이벤트 검색(`search_log`), 원격(ssh)·gz·euc-kr, 의존성 제로 | `pi install npm:pi-log` |
 
 ## 동작 모습
 

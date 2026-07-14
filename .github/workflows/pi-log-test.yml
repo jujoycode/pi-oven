@@ -1,6 +1,7 @@
 name: pi-log test
 
-# 파일시스템만 쓰는 동작 테스트 — 서비스 컨테이너 없이 수 초면 끝난다.
+# 동작 테스트 — 서비스 컨테이너 없이 수 초면 끝난다.
+# 원격(ssh) 모드는 러너 자신에게 루프백 sshd를 세워 실제 ssh 경유로 검증한다.
 
 on:
   push:
@@ -23,4 +24,15 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: node --experimental-strip-types packages/pi-log/test/log.test.mjs
+      - name: Set up loopback sshd for remote-mode tests
+        run: |
+          sudo apt-get install -y -qq openssh-server
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keygen -t ed25519 -N '' -f ~/.ssh/pi_log_test -q
+          cat ~/.ssh/pi_log_test.pub >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+          sudo systemctl start ssh
+      - run: >
+          PI_LOG_SSH_HOST="$USER@127.0.0.1"
+          PI_LOG_SSH_KEY="$HOME/.ssh/pi_log_test"
+          node --experimental-strip-types packages/pi-log/test/log.test.mjs

@@ -1,28 +1,49 @@
 /**
  * log.test.mjs — pi-log 동작 테스트
  *
- * 실제 파일시스템에서 tail_log/watch_log의 전체 경로를 검증한다:
+ * 실제 파일시스템에서 tail_log/watch_log/search_log의 전체 경로를 검증한다:
  * 역방향 tail, grep+context, 커서 증분, 로테이션 감지, .gz, euc-kr,
- * watch의 매치(후행 문맥 수집)·타임아웃 보고·경쟁 없는 폴링.
+ * watch의 매치(후행 문맥 수집)·타임아웃 보고·경쟁 없는 폴링,
+ * search의 grep 형식 출력·글롭·매치 상한.
  *
- * 실행: node --experimental-strip-types packages/pi-log/test/log.test.mjs
+ * 원격(ssh) 모드는 PI_LOG_SSH_HOST가 설정된 경우에만 돈다 — 루프백 sshd에
+ * 접속해 같은 파일을 원격 경로로 다시 검증한다:
+ *   PI_LOG_SSH_HOST=user@127.0.0.1 [PI_LOG_SSH_PORT=22] [PI_LOG_SSH_KEY=~/.ssh/key] \
+ *     node --experimental-strip-types packages/pi-log/test/log.test.mjs
  */
 
-import { appendFileSync, mkdtempSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+
+const SSH_HOST = process.env.PI_LOG_SSH_HOST;
+
+const workDir = mkdtempSync(join(tmpdir(), "pi-log-cfg-"));
+mkdirSync(join(workDir, ".pi"));
+if (SSH_HOST) {
+  const args = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"];
+  if (process.env.PI_LOG_SSH_KEY) args.push("-i", process.env.PI_LOG_SSH_KEY);
+  writeFileSync(
+    join(workDir, ".pi", "log.json"),
+    JSON.stringify({ srv: { host: SSH_HOST, port: Number(process.env.PI_LOG_SSH_PORT ?? 22), args } }),
+  );
+} else {
+  writeFileSync(join(workDir, ".pi", "log.json"), "{}");
+}
+process.chdir(workDir); // 설정 경로가 cwd 기준이므로 import 전에 이동
 
 const extPath = fileURLToPath(new URL("../extensions/watch-log.ts", import.meta.url));
 const { default: register } = await import(extPath);
 
 const tools = {};
 register({ registerTool: (def) => (tools[def.name] = def), on: () => {} });
-if (!tools.tail_log || !tools.watch_log) throw new Error("tools not registered");
+if (!tools.tail_log || !tools.watch_log || !tools.search_log) throw new Error("tools not registered");
 
 const tail = (p) => tools.tail_log.execute("t", p);
 const watch = (p, signal) => tools.watch_log.execute("t", p, signal);
+const search = (p) => tools.search_log.execute("t", p);
 const text = (r) => r.content[0].text;
 
 const dir = mkdtempSync(join(tmpdir(), "pi-log-test-"));
@@ -157,6 +178,99 @@ await check("watch: abort signal stops the wait early", async () => {
   expect(Date.now() - started < 5_000, "abort did not stop the wait");
   expect(r.details.matched === false && text(r).includes("cancelled"), "cancel not reported");
 });
+
+// ---------------------------------------------------------------- search_log
+
+await check("search: grep-format output across glob + .gz", async () => {
+  const p1 = join(dir, "app.log");
+  writeFileSync(p1, ["boot", "req 1 ok", "ERROR pay failed id=7", "retrying", "req 2 ok"].join("\n") + "\n");
+  const p2 = join(dir, "app.log.1.gz");
+  writeFileSync(p2, gzipSync(Buffer.from("old boot\nERROR pay failed id=3\nold done\n")));
+  const r = await search({ pattern: "pay failed", files: [join(dir, "app.log*")], context: 1 });
+  expect(r.details.matches === 2, `expected 2 matches, got ${r.details.matches}`);
+  expect(text(r).includes(`${p1}:3:ERROR pay failed id=7`), "file:line:match format wrong: " + text(r));
+  expect(text(r).includes(`${p1}-2-req 1 ok`) && text(r).includes(`${p1}-4-retrying`), "context missing");
+  expect(text(r).includes(`${p2}:2:ERROR pay failed id=3`), "gz search missing: " + text(r));
+});
+
+await check("search: maxMatches caps per file", async () => {
+  const p = join(dir, "many.log");
+  writeFileSync(p, Array.from({ length: 40 }, (_, i) => `ERROR n${i}`).join("\n") + "\n");
+  const r = await search({ pattern: "ERROR", files: [p], maxMatches: 5, context: 0 });
+  expect(r.details.matches === 5, `expected 5, got ${r.details.matches}`);
+});
+
+await check("search: no matching files is a clear error", async () => {
+  let threw = false;
+  try {
+    await search({ pattern: "x", files: [join(dir, "absent*.log")] });
+  } catch (e) {
+    threw = true;
+    expect(e.message.includes("no files matched"), "unexpected: " + e.message);
+  }
+  expect(threw, "no error raised");
+});
+
+await check("search: no matches reports zero, not an error", async () => {
+  const r = await search({ pattern: "NEVER_THERE", files: [join(dir, "app.log")] });
+  expect(r.details.matches === 0 && text(r).includes("no matches"), "zero-match report wrong");
+});
+
+// ---------------------------------------------------------------- 원격(ssh) 모드 — 루프백 sshd 필요
+
+if (!SSH_HOST) {
+  console.log("SKIP remote (set PI_LOG_SSH_HOST to run ssh-mode tests)");
+} else {
+  await check("remote tail: last lines + since cursor over ssh", async () => {
+    const r1 = await tail({ path: big, server: "srv", lines: 2 });
+    expect(text(r1).includes("INFO after"), "remote tail wrong: " + text(r1).slice(0, 200));
+    appendFileSync(big, "2026-07-12 12:00:02 INFO remote-new\n");
+    const r2 = await tail({ path: big, server: "srv", since: r1.details.cursor });
+    expect(r2.details.lines === 1 && text(r2).includes("remote-new"), "remote since wrong");
+  });
+
+  await check("remote tail: .gz via gunzip on the server", async () => {
+    const r = await tail({ path: join(dir, "app.log.1.gz"), server: "srv", lines: 2 });
+    expect(text(r).includes("ERROR pay failed id=3"), "remote gz wrong: " + text(r).slice(0, 200));
+  });
+
+  await check("remote search: zgrep across glob on the server", async () => {
+    const r = await search({ pattern: "pay failed", server: "srv", files: [join(dir, "app.log*")], context: 1 });
+    expect(r.details.matches === 2, `expected 2 matches, got ${r.details.matches}: ` + text(r).slice(0, 300));
+    expect(text(r).includes(":3:ERROR pay failed id=7"), "remote grep format wrong");
+  });
+
+  await check("remote search: server config logs used when files omitted", async () => {
+    let threw = false;
+    try {
+      await search({ pattern: "x", server: "srv" }); // srv에는 logs 설정이 없다
+    } catch (e) {
+      threw = true;
+      expect(e.message.includes('no "logs" configured'), "unexpected: " + e.message);
+    }
+    expect(threw, "no error raised");
+  });
+
+  await check("remote watch: pattern appears over ssh", async () => {
+    const p = join(dir, "rwatch.log");
+    writeFileSync(p, "before\n");
+    const t = setTimeout(() => appendFileSync(p, "warm\nERROR remote boom\n"), 1_000);
+    const r = await watch({ path: p, server: "srv", pattern: "ERROR", timeout: 20 });
+    clearTimeout(t);
+    expect(r.details.matched === true, "remote watch missed: " + text(r).slice(0, 300));
+    expect(text(r).includes(">>> ERROR remote boom"), "marker missing");
+  });
+
+  await check("remote: unknown server lists available names", async () => {
+    let msg = "";
+    try {
+      await tail({ path: big, server: "nope" });
+    } catch (e) {
+      msg = e.message;
+    }
+    expect(msg.includes("available: srv"), "server list missing: " + msg);
+  });
+}
 
 console.log(failures === 0 ? "\nALL OK" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
