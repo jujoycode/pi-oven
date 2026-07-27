@@ -9,9 +9,11 @@
  * - HWP 5.x: CFB(Compound File) + BodyText/Section* 레코드 스트림.
  *   HWPTAG_PARA_TEXT(67)의 UTF-16LE 텍스트를 걷고, 제어문자는
  *   종류별 크기(1 또는 8 워드)만큼 건너뛴다.
- * - 암호화/배포용(DRM) 문서는 지원하지 않고 명확한 에러를 낸다.
+ * - 암호화/배포용(DRM) 문서와 손상 파일(CRC 불일치, 순환 섹터 체인)은
+ *   지원하지 않고 명확한 에러를 낸다. CFB는 v3(512바이트 섹터)만 지원 — HWP는 항상 v3다.
  *
  * 외부 의존성 없음: ZIP/CFB 파서 직접 구현 + node:zlib.
+ * (2026-07 오픈소스 대체 검토 후 유지 결정 — 근거는 CLAUDE.md 참고)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -19,7 +21,7 @@ import { Type } from "typebox";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { inflateRawSync } from "node:zlib";
+import { crc32, inflateRawSync } from "node:zlib";
 
 // ---------------------------------------------------------------- ZIP
 
@@ -42,7 +44,9 @@ export function readZip(buf: Buffer): Map<string, Buffer> {
 
   for (let n = 0; n < count; n++) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const gpFlags = buf.readUInt16LE(pos + 8);
     const method = buf.readUInt16LE(pos + 10);
+    const crc = buf.readUInt32LE(pos + 16);
     const compSize = buf.readUInt32LE(pos + 20);
     const nameLen = buf.readUInt16LE(pos + 28);
     const extraLen = buf.readUInt16LE(pos + 30);
@@ -50,12 +54,19 @@ export function readZip(buf: Buffer): Map<string, Buffer> {
     const localOffset = buf.readUInt32LE(pos + 42);
     const name = buf.subarray(pos + 46, pos + 46 + nameLen).toString("utf8");
 
+    if (gpFlags & 0x1) throw new Error(`encrypted zip entry '${name}' — cannot read`);
+    if (method !== 0 && method !== 8) {
+      throw new Error(`unsupported zip compression method ${method} ('${name}')`);
+    }
+
     // local header의 name/extra 길이는 central과 다를 수 있어 다시 읽는다
     const lNameLen = buf.readUInt16LE(localOffset + 26);
     const lExtraLen = buf.readUInt16LE(localOffset + 28);
     const dataStart = localOffset + 30 + lNameLen + lExtraLen;
     const raw = buf.subarray(dataStart, dataStart + compSize);
-    entries.set(name, method === 8 ? inflateRawSync(raw) : Buffer.from(raw));
+    const data = method === 8 ? inflateRawSync(raw) : Buffer.from(raw);
+    if (crc32(data) !== crc) throw new Error(`corrupt zip: CRC mismatch ('${name}')`);
+    entries.set(name, data);
 
     pos += 46 + nameLen + extraLen + commentLen;
   }
@@ -145,7 +156,12 @@ const ENDOFCHAIN = 0xfffffffe;
 /** 최소 CFB 리더: "경로/스트림이름" → 데이터 맵을 만든다. */
 export function readCfb(buf: Buffer): Map<string, Buffer> {
   const sectorSize = 1 << buf.readUInt16LE(30);
+  if (sectorSize !== 512) {
+    throw new Error(`unsupported CFB sector size ${sectorSize} — only v3 (512-byte sectors) is supported`);
+  }
   const miniCutoff = buf.readUInt32LE(56);
+  // 손상 파일의 순환 체인 가드: 어떤 체인도 파일의 전체 섹터 수를 넘을 수 없다
+  const totalSectors = Math.ceil(buf.length / sectorSize);
 
   // FAT: 헤더 DIFAT 109개 + DIFAT 체인
   const fatSectors: number[] = [];
@@ -154,7 +170,9 @@ export function readCfb(buf: Buffer): Map<string, Buffer> {
     if (s !== 0xffffffff) fatSectors.push(s);
   }
   let difat = buf.readUInt32LE(68);
+  let difatHops = 0;
   while (difat !== ENDOFCHAIN && difat !== 0xffffffff) {
+    if (++difatHops > totalSectors) throw new Error("corrupt CFB: cyclic DIFAT chain");
     const base = 512 + difat * sectorSize;
     for (let i = 0; i < sectorSize / 4 - 1; i++) {
       const s = buf.readUInt32LE(base + i * 4);
@@ -172,6 +190,7 @@ export function readCfb(buf: Buffer): Map<string, Buffer> {
     const parts: Buffer[] = [];
     let s = start;
     while (s !== ENDOFCHAIN && s !== 0xffffffff && s < fat.length) {
+      if (parts.length >= totalSectors) throw new Error("corrupt CFB: cyclic sector chain");
       const base = 512 + s * sectorSize;
       parts.push(buf.subarray(base, base + sectorSize));
       s = fat[s];
@@ -204,6 +223,7 @@ export function readCfb(buf: Buffer): Map<string, Buffer> {
     const parts: Buffer[] = [];
     let s = start;
     while (s !== ENDOFCHAIN && s !== 0xffffffff && s * 4 < miniFatData.length) {
+      if (parts.length > miniFatData.length / 4) throw new Error("corrupt CFB: cyclic mini-sector chain");
       parts.push(miniStream.subarray(s * 64, s * 64 + 64));
       s = miniFatData.readUInt32LE(s * 4);
     }
@@ -211,8 +231,10 @@ export function readCfb(buf: Buffer): Map<string, Buffer> {
   };
 
   const streams = new Map<string, Buffer>();
+  const visited = new Set<number>(); // 디렉토리 left/right/child 순환 참조 가드
   const walk = (idx: number, prefix: string): void => {
-    if (idx < 0 || idx >= entryCount) return;
+    if (idx < 0 || idx >= entryCount || visited.has(idx)) return;
+    visited.add(idx);
     const e = entry(idx);
     walk(e.left, prefix);
     walk(e.right, prefix);

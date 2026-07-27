@@ -7,8 +7,10 @@
  * - 제목(text:h)은 outline-level에 따라 마크다운 #으로
  * - 표(table:table)는 행 단위 "| 셀 | 셀 |"로
  * - text:s(공백 압축), text:tab, text:line-break 처리
+ * - 암호화 ZIP과 손상 파일(CRC 불일치)은 지원하지 않고 명확한 에러를 낸다
  *
  * 외부 의존성 없음: ZIP 파서 직접 구현 + node:zlib.
+ * (2026-07 오픈소스 대체 검토 후 유지 결정 — 근거는 CLAUDE.md 참고)
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
@@ -16,7 +18,7 @@ import { Type } from "typebox";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { inflateRawSync } from "node:zlib";
+import { crc32, inflateRawSync } from "node:zlib";
 
 // ---------------------------------------------------------------- ZIP
 
@@ -38,7 +40,9 @@ export function readZip(buf: Buffer): Map<string, Buffer> {
 
   for (let n = 0; n < count; n++) {
     if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const gpFlags = buf.readUInt16LE(pos + 8);
     const method = buf.readUInt16LE(pos + 10);
+    const crc = buf.readUInt32LE(pos + 16);
     const compSize = buf.readUInt32LE(pos + 20);
     const nameLen = buf.readUInt16LE(pos + 28);
     const extraLen = buf.readUInt16LE(pos + 30);
@@ -46,11 +50,18 @@ export function readZip(buf: Buffer): Map<string, Buffer> {
     const localOffset = buf.readUInt32LE(pos + 42);
     const name = buf.subarray(pos + 46, pos + 46 + nameLen).toString("utf8");
 
+    if (gpFlags & 0x1) throw new Error(`encrypted zip entry '${name}' — cannot read`);
+    if (method !== 0 && method !== 8) {
+      throw new Error(`unsupported zip compression method ${method} ('${name}')`);
+    }
+
     const lNameLen = buf.readUInt16LE(localOffset + 26);
     const lExtraLen = buf.readUInt16LE(localOffset + 28);
     const dataStart = localOffset + 30 + lNameLen + lExtraLen;
     const raw = buf.subarray(dataStart, dataStart + compSize);
-    entries.set(name, method === 8 ? inflateRawSync(raw) : Buffer.from(raw));
+    const data = method === 8 ? inflateRawSync(raw) : Buffer.from(raw);
+    if (crc32(data) !== crc) throw new Error(`corrupt zip: CRC mismatch ('${name}')`);
+    entries.set(name, data);
 
     pos += 46 + nameLen + extraLen + commentLen;
   }
