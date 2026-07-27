@@ -31,6 +31,7 @@ Where fresh pi packages are baked. `╭◕‿◕╮`
 ```bash
 npm install          # workspace 의존성 설치
 npm run typecheck    # 전 패키지 타입 체크 (빌드 스텝은 없다 — pi가 TS를 직접 로드)
+npm test             # pi-hwp/pi-odt 손파서 유닛 테스트 (node:test, 픽스처는 코드로 조립)
 pi -e ./packages/pi-ui-kit   # 로컬에서 바로 실행
 ```
 

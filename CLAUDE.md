@@ -25,10 +25,11 @@ These override anything else in this file when they conflict:
 ```bash
 npm install                    # install workspace deps
 npm run typecheck              # tsc --noEmit over packages/*/extensions/**/*.ts (strict)
+npm test                       # node:test unit tests for the pi-hwp/pi-odt hand-written parsers
 pi -e ./packages/<name>        # load a package into a local pi session without installing
 ```
 
-There is **no build step** — pi loads the TypeScript sources directly — and no test runner or linter. `npm run typecheck` is the repo-wide automated check; CI (`.github/workflows/typecheck.yml`) runs exactly `npm ci && npm run typecheck` on Node 22. Exception: pi-db has a real-database integration test (`node --experimental-strip-types packages/pi-db/test/integration.mjs` against dockerized MySQL 8.4 + Oracle Free 23; CI runs the same script via service containers in `.github/workflows/pi-db-integration.yml` when pi-db changes). Other behavioral verification is manual: load the package with `pi -e` and exercise the tool in a real session (against real `.hwp`/`.odt` files for the readers).
+There is **no build step** — pi loads the TypeScript sources directly — and no linter. `npm run typecheck` and `npm test` are the repo-wide automated checks; CI (`.github/workflows/typecheck.yml`) runs exactly `npm ci && npm run typecheck && npm test` on Node 22. The unit tests (`packages/pi-{hwp,odt}/test/unit.test.mjs`, plain `node --test` with `--experimental-strip-types`) assemble ZIP/CFB fixtures in code — no binary fixtures are committed. pi-db additionally has a real-database integration test (`node --experimental-strip-types packages/pi-db/test/integration.mjs` against dockerized MySQL 8.4 + Oracle Free 23; CI runs the same script via service containers in `.github/workflows/pi-db-integration.yml` when pi-db changes). Other behavioral verification is manual: load the package with `pi -e` and exercise the tool in a real session (against real `.hwp`/`.odt` files for the readers).
 
 ## Architecture
 
@@ -46,7 +47,8 @@ Adding a new package: create the directory with the manifest fields above plus `
 
 ### Conventions that matter
 
-- **Zero dependencies in the document readers** (`pi-hwp`, `pi-odt`): ZIP/CFB parsing is implemented by hand in the extension file; decompression uses `node:zlib` (`inflateRawSync`). A pure-TS inflate was tried and deliberately reverted (see git history) — don't reintroduce one. Unsupported/encrypted formats are rejected with clear errors rather than partial output.
+- **Zero dependencies in the document readers** (`pi-hwp`, `pi-odt`): ZIP/CFB parsing is implemented by hand in the extension file; decompression uses `node:zlib` (`inflateRawSync`). A pure-TS inflate was tried and deliberately reverted (see git history) — don't reintroduce one. Unsupported/encrypted/corrupt input (encrypted ZIP entries, CRC mismatches, cyclic CFB sector chains, CFB v4) is rejected with clear errors rather than partial output.
+- **Replacing the hand-written parsers with open-source libraries was evaluated and declined (2026-07)**, with hands-on testing against real files. Reasons: the only ZIP candidate matching principle 1 (adm-zip — sole sync-API library using `node:zlib`) has a repeated CVE history; the only viable CFB library (SheetJS `cfb`) has been frozen on npm since 2022-04; fflate ships its own pure-JS inflate (conflicts with the revert above); and `pi install` auto-installs a package's dependencies onto every user's machine, so transitive deps are end-user attack surface. Don't re-litigate without new facts — re-evaluate if SheetJS resumes npm releases or `hwp-convert` (functionally strong, too young as of 2026-07) matures.
 - Reader output is markdown-ish plain text: headings as `#`, table rows as `| cell | cell |`, output capped (e.g. 200k chars) with an explicit `[truncated ...]` marker.
 - TUI components (`pi-ui-kit`) size everything by `visibleWidth` from `@earendil-works/pi-tui`; Pai mascot glyphs are all width 1 so they align inside any box. Theming: crust/border via `theme.fg("accent")`, steam via `theme.fg("dim")`.
 - Older pi versions use the `@mariozechner/*` namespace instead of `@earendil-works/*` (and `@sinclair/typebox` instead of `typebox`); the current code targets `@earendil-works/*`.
